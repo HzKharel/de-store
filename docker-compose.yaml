@@ -1,0 +1,106 @@
+version: '3.9'
+
+services:
+  db:
+    image: mongo:latest
+    ports:
+      - 27017:27017
+    volumes:
+      - de_store:/data/db
+    networks:
+      - destore
+  auth:
+    depends_on:
+      - db
+    environment:
+      - AUTH_DB=mongodb://db:27017/auth
+      - AUTH_API=auth:5000
+      - MANAGEMENT_API=management:5004
+      - ORDER_API=order:5002
+      - PRODUCT_API=product:5001
+    build:
+      context: ./auth-service/
+      dockerfile: Dockerfile
+    ports:
+      - 5000:3010
+    networks:
+      - destore
+  management:
+    depends_on:
+      - db
+    environment:
+      - PRODUCTS_DB=mongodb://db:27017/products
+      - MAIL_DB=mongodb://db:27017/mail
+      - AUTH_API=auth:5000
+      - MANAGEMENT_API=management:5004
+      - ORDER_API=order:5002
+      - PRODUCT_API=product:5001
+    build:
+      context: ./management-service/
+      dockerfile: Dockerfile
+    ports:
+      - 5004:3004
+    networks:
+      - destore
+  order:
+    depends_on:
+      - db
+    build:
+      context: ./order-service/
+      dockerfile: Dockerfile
+    environment:
+      - ORDER_DB=mongodb://db:27017/order
+      - AUTH_API=auth:5000
+      - MANAGEMENT_API=management:5004
+      - ORDER_API=order:5002
+      - PRODUCT_API=product:5001
+    ports:
+      - 5002:3002
+    networks:
+      - destore
+  product:
+    depends_on:
+      - db
+    build:
+      context: ./product-service/
+      dockerfile: Dockerfile
+    environment:
+      - PRODUCTS_DB=mongodb://db:27017/products
+      - AUTH_API=auth:5000
+      - MANAGEMENT_API=management:5004
+      - ORDER_API=order:5002
+      - PRODUCT_API=product:5001
+    ports:
+      - 5001:3001
+    networks:
+      - destore
+  ui:
+    stdin_open: true
+    environment:
+      - AUTH_API=auth:5000
+      - MANAGEMENT_API=management:5004
+      - ORDER_API=order:5002
+      - PRODUCT_API=product:5001
+    build:
+      context: ./ui/
+      dockerfile: Dockerfile
+    ports:
+      - 4200:3000
+    networks:
+      - destore
+  lb:
+    image: haproxy
+    volumes:
+      - ./gateway:/usr/local/etc/haproxy
+    ports:
+      - "6000:8080"
+    networks:
+      - destore
+
+volumes:
+  de_store:
+
+networks:
+  destore:
+    driver: bridge
+
